@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Http\Controllers\API;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+
+class AuthController extends Controller
+{
+    public function signup(Request $request)
+    {
+        $validateUser = Validator::make(
+            $request->all(),
+            [
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|string|confirmed|min:6',
+            ]
+        );
+    
+        if ($validateUser->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation Error',
+                'errors' => $validateUser->errors()->all(),
+            ], 422);
+        }
+    
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password), 
+        ]);
+    
+        return response()->json([
+            'status' => true,
+            'message' => 'User Created Successfully',
+            'user' => $user,
+        ], 201);
+    }
+  
+    public function login(Request $request)
+    {
+        $validateUser = Validator::make(
+            $request->all(),
+            [
+                'email' => 'required|email',
+                'password' => 'required',
+            ]
+        );
+    
+        if ($validateUser->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation Error',
+                'errors' => $validateUser->errors()->all(),
+            ], 422);
+        }
+    
+        if (Auth::attempt([
+            'email' => $request->email,
+            'password' => $request->password,
+        ])) {
+            $authUser = Auth::user();
+            $token = $authUser->createToken("API Token")->plainTextToken;
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User Logged In Successfully',
+                'token' => $token,
+                'token_type' => 'bearer'
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid Email or Password',
+            ], 401);
+        }
+    }
+  
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+        $user->tokens()->delete();
+        return response()->json([
+            'status' => true,
+            'message' => 'Logged out successfully',
+            'user' => $user,
+        ], 200);
+    }
+}
